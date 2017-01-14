@@ -1,55 +1,51 @@
 package com.foodreviews.spark
 
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.{SparkConf, SparkContext}
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.functions.{desc, concat, lit, col}
+import org.apache.spark.sql.{SparkSession}
+import org.apache.spark.{SparkConf}
 
 /**
   * Created by vladyslav.bachurin on 1/11/2017.
   */
 object FR1000MostUsedWords {
+
   def main(args: Array[String]): Unit = {
     // Set the log level to only print errors
     Logger.getLogger("org").setLevel(Level.ERROR)
 
-/*
     val conf = new SparkConf()
-      .setMaster("local[*]")
+      .setMaster("local[*]") // The job will be running locally, use all cores
       .setAppName("FR1000MostUsedWords")
+      .set("spark.sql.warehouse.dir", "C:/tmp") // Hack for Windows only
 
+    // Creating Spark session
     val spark = SparkSession.builder.config(conf).getOrCreate()
-    val sc = spark.read.option("header","true").csv("../amazon-fine-foods/Reviews.csv")
-*/
 
-    // Create a SparkContext using every core of the local machine
-    val sc = new SparkContext("local[*]", "FR1000MostUsedWords")
+    // Creating Spark data frame from file
+    val df = spark.sqlContext.read
+      .format("com.databricks.spark.csv") // Use pre-defined CSV data format
+      .option("header", "true") // Use first line of all files as header
+      .option("inferSchema", "true") // Automatically infer data types
+      .load("../amazon-fine-foods/Reviews.csv")
+    // The 'amazon-fine-foods' dir must be on the same level with 'food-reviews' dir
 
-    // Load up each line of the reviews data into an RDD
-    val lines = sc.textFile("../amazon-fine-foods/Reviews.csv")
+    // Will be counting words for Summary and Text together, that is why use concat
+    val summaryAndText = df.select(concat(col("Summary"), lit(" "), col("Text")))
 
+    // Using the implicit encoder
+    import spark.implicits._
 
-    val header = lines.first() // extract header
-    val data = lines.filter(row => row != header) // filter out header
+    // Splitting text into words (by anything but words and apostrophes)
+    val words = summaryAndText.flatMap(x => x.toString().toLowerCase().split("[^\\w']+"))
 
-    // Convert each line to a string, split it out by tabs, and extract the fourth field.
-    //val summaryAndText = lines.map(x => {x.toString().split(","); (x(8).toString, x(9).toString)})
-    val summaryAndText = data.map(x => {val y = x.toString().split(","); (y(8), y(9))})
+    // Grouping by words, counting instances in each group, ordering by count
+    val counts = words.groupBy("value").count().orderBy(desc("count"));
 
+    // Taking 1000 most used words
+    counts.take(1000).foreach(println)
 
-    val words = summaryAndText.flatMap(x => ("" + x._1 + " " + x._2 + " "))
-
-    words.take(100).foreach(print)
-/*
-    // Flip
-    val flipped = results.map(x => (x._2, x._1))
-
-    // Sort the resulting map of (word, count) tuples
-    val sortedResults = flipped.sortByKey(false)
-
-    val first1000 = sortedResults.take(1000)
-
-    // Print each result on its own line.
-    first1000.foreach(println)
-    */
+    // Closing Spark session
+    spark.stop()
   }
 }
