@@ -1,16 +1,16 @@
 package com.foodreviews.spark
 
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.functions.{desc, concat, lit, col}
-import org.apache.spark.sql.{SparkSession}
-import org.apache.spark.{SparkConf}
+import org.apache.spark.SparkConf
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.functions.{col, concat, desc, lit}
 
 /**
   * Created by vladyslav.bachurin on 1/11/2017.
   */
 object FR1000MostUsedWords {
 
-  def main(args: Array[String]): Unit = {
+  def run(): Unit = {
     // Set the log level to only print errors
     Logger.getLogger("org").setLevel(Level.ERROR)
 

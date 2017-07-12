@@ -7,7 +7,7 @@ import org.apache.spark.SparkContext
   * Created by vladyslav.bachurin on 1/11/2017.
   */
 object FR1000MostActiveUsers {
-  def main(args: Array[String]): Unit = {
+  def run(): Unit = {
     // Set the log level to only print errors
     Logger.getLogger("org").setLevel(Level.ERROR)
 
