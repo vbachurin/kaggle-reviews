@@ -22,7 +22,7 @@ object Main {
   val spark =
     SparkSession
       .builder()
-      .appName("Foor Reviews")
+      .appName("Food Reviews")
       .config("spark.master", "local")
       .getOrCreate()
 
@@ -41,9 +41,13 @@ object Main {
       .load("../amazon-fine-foods/Reviews.csv")
     // The 'amazon-fine-foods' dir must be on the same level with 'food-reviews' dir
 
-    mostActiveUsers(df)
-    mostCommentedFood(df)
-    mostUsedWords(df)
+    args match {
+      case Array("mostActiveUsers") => mostActiveUsers(df)
+      case Array("mostCommentedFood") => mostCommentedFood(df)
+      case Array("mostUsedWords") => mostUsedWords(df)
+      case _ => mostActiveUsers(df); mostCommentedFood(df);mostUsedWords(df)
+    }
+
 
     // Closing Spark session
     spark.stop()
