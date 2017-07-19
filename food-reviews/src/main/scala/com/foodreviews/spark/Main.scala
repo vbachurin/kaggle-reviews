@@ -48,16 +48,18 @@ object Main {
       case _ => mostActiveUsers(df); mostCommentedFood(df);mostUsedWords(df)
     }
 
-
     // Closing Spark session
     spark.stop()
+
+    if (args.contains("translate=true"))
+      translate(df)
   }
 
-  def mostActiveUsers(df: DataFrame) =
-    df.select($"ProfileName").groupBy($"ProfileName").count().orderBy(desc("count")).show(1000)
-
+  def mostActiveUsers(df: DataFrame) = {
+    df.select($"ProfileName").groupBy($"ProfileName").count().orderBy(desc("count")).limit(1000).orderBy("ProfileName").show(1000)
+  }
   def mostCommentedFood(df: DataFrame) =
-    df.select($"ProductId").groupBy($"ProductId").count().orderBy(desc("count")).show(1000)
+    df.select($"ProductId").groupBy($"ProductId").count().orderBy(desc("count")).limit(1000).orderBy("ProductId").show(1000)
 
   def mostUsedWords(df: DataFrame) = {
     // Will be counting words for Summary and Text together, that is why use concat
@@ -67,7 +69,9 @@ object Main {
     val words = summaryAndText.flatMap(_.toString().toLowerCase().split("[^\\w']+"))
 
     // Grouping by words, counting instances in each group, ordering by count
-    words.groupBy("value").count().orderBy(desc("count")).show(1000)
+    words.groupBy("value").count().orderBy(desc("count")).limit(1000).orderBy("value").show(1000)
   }
+
+  def translate(df: DataFrame) = ???
 
 }
