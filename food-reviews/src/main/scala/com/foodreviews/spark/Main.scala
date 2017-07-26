@@ -1,23 +1,12 @@
 package com.foodreviews.spark
 
+import io.gatling.app.Gatling
+import io.gatling.core.config.GatlingPropertiesBuilder
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.functions.{concat, desc, lit}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 object Main {
-
-  case class Review(
-                     id: Int,
-                     productId: Int,
-                     userId: Int,
-                     profileName: String,
-                     helpfulnessNumerator: Int,
-                     helpfulnessDenominator: Int,
-                     score: Int,
-                     time: Long,
-                     summary: String,
-                     text: String
-                   )
 
   val spark =
     SparkSession
@@ -45,14 +34,14 @@ object Main {
       case Array("mostActiveUsers") => mostActiveUsers(df)
       case Array("mostCommentedFood") => mostCommentedFood(df)
       case Array("mostUsedWords") => mostUsedWords(df)
-      case _ => mostActiveUsers(df); mostCommentedFood(df);mostUsedWords(df)
+      case _ => mostActiveUsers(df); mostCommentedFood(df); mostUsedWords(df)
     }
 
     // Closing Spark session
     spark.stop()
 
     if (args.contains("translate=true"))
-      translate(df)
+      translate
   }
 
   def mostActiveUsers(df: DataFrame) = {
@@ -66,12 +55,21 @@ object Main {
     val summaryAndText = df.select(concat($"Summary", lit(" "), $"Text"))
 
     // Splitting text into words (by anything but words and apostrophes)
-    val words = summaryAndText.flatMap(_.toString().toLowerCase().split("[^\\w']+"))
+    val words = summaryAndText.flatMap(_.toString().toLowerCase().split("[^\\w']+").filter(_ != ""))
 
     // Grouping by words, counting instances in each group, ordering by count
     words.groupBy("value").count().orderBy(desc("count")).limit(1000).orderBy("value").show(1000)
   }
 
-  def translate(df: DataFrame) = ???
+  def translate = {
+    // This sets the class for the Simulation we want to run.
+    val simClass = classOf[TranslateReviews].getName
+
+    val props = new GatlingPropertiesBuilder
+    props.sourcesDirectory("./src/main/scala")
+    props.binariesDirectory("./target/scala-2.11/classes")
+    props.simulationClass(simClass)
+    Gatling.fromMap(props.build)
+  }
 
 }
