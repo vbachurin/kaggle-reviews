@@ -5,8 +5,18 @@ import io.gatling.core.config.GatlingPropertiesBuilder
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.functions.{concat, desc, lit}
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.rogach.scallop._
+
+class Conf(arguments: Seq[String]) extends ScallopConf(arguments) {
+  val path = opt[String](default = Option("Reviews.csv"))
+  val translate = opt[Boolean](default = Option(false))
+  val tasks = trailArg[List[String]](required = false, default = Option(Nil))
+  verify()
+}
 
 object Main {
+
+  Logger.getLogger("org").setLevel(Level.ERROR)
 
   val spark =
     SparkSession
@@ -15,38 +25,46 @@ object Main {
       .config("spark.master", "local")
       .getOrCreate()
 
+  // Set the log level to only print errors
+  spark.sparkContext.setLogLevel("ERROR")
+
   import spark.implicits._
 
   def main(args: Array[String]): Unit = {
 
-    // Set the log level to only print errors
-    Logger.getLogger("org").setLevel(Level.ERROR)
+    val conf = new Conf(args)
 
     // Creating Spark data frame from file
     val df = spark.sqlContext.read
       .format("com.databricks.spark.csv") // Use pre-defined CSV data format
       .option("header", "true") // Use first line of all files as header
       .option("inferSchema", "true") // Automatically infer data types
-      .load("../amazon-fine-foods/Reviews.csv")
-    // The 'amazon-fine-foods' dir must be on the same level with 'food-reviews' dir
+      .load(conf.path())
 
-    args match {
-      case Array("mostActiveUsers") => mostActiveUsers(df)
-      case Array("mostCommentedFood") => mostCommentedFood(df)
-      case Array("mostUsedWords") => mostUsedWords(df)
-      case _ => mostActiveUsers(df); mostCommentedFood(df); mostUsedWords(df)
+    runTasks(conf.tasks())
+
+    def runTasks(tasks: List[String]): Unit = {
+      tasks match {
+        case Nil => println("No more Spark tasks to run.")
+        case "mostActiveUsers"    :: t => mostActiveUsers(df); runTasks(t)
+        case "mostCommentedFood"  :: t => mostCommentedFood(df); runTasks(t)
+        case "mostUsedWords"      :: t => mostUsedWords(df); runTasks(t)
+        case List("all") => mostActiveUsers(df); mostCommentedFood(df); mostUsedWords(df)
+        case _ => println("One of the task names is incorrect or none specified. " +
+          "Possible values: mostActiveUsers mostCommentedFood mostUsedWords")
+      }
     }
 
     // Closing Spark session
     spark.stop()
 
-    if (args.contains("translate=true"))
-      translate
+    if (conf.translate()) translate
   }
 
   def mostActiveUsers(df: DataFrame) = {
     df.select($"ProfileName").groupBy($"ProfileName").count().orderBy(desc("count")).limit(1000).orderBy("ProfileName").show(1000)
   }
+
   def mostCommentedFood(df: DataFrame) =
     df.select($"ProductId").groupBy($"ProductId").count().orderBy(desc("count")).limit(1000).orderBy("ProductId").show(1000)
 
@@ -71,5 +89,4 @@ object Main {
     props.simulationClass(simClass)
     Gatling.fromMap(props.build)
   }
-
 }

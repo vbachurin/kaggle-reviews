@@ -8,5 +8,6 @@ sparkComponents += "sql"
 
 libraryDependencies ++= Seq(
   "io.gatling.highcharts" % "gatling-charts-highcharts" % "2.2.5",
-  "io.gatling"            % "gatling-test-framework"    % "2.2.5"
+  "io.gatling"            % "gatling-test-framework"    % "2.2.5",
+  "org.rogach"            %% "scallop" % "3.0.3"
 )
