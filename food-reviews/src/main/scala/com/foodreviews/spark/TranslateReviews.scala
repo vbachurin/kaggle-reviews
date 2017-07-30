@@ -23,7 +23,7 @@ class TranslateReviews extends Simulation {
   private val body = """{ "input_lang": "en",  "output_lang": "fr", "text": "${Text}" }"""
   val scn = scenario("Google Translate")
     .feed(
-      csv("../amazon-fine-foods/Reviews.csv")
+      csv("Reviews.csv")
 //      .convert(splitToFitInBody)
      )
     .exec(http("en_to_fr")
