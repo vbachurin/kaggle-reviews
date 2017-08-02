@@ -1,8 +1,8 @@
-package com.foodreviews.spark
+package com.foodreviews
 
 import io.gatling.core.Predef._
-import io.gatling.http.Predef._
 import io.gatling.core.body.StringBody
+import io.gatling.http.Predef._
 
 import scala.concurrent.duration._
 import scala.reflect.io.File
@@ -17,14 +17,20 @@ class TranslateReviews extends Simulation {
     .acceptEncodingHeader("gzip, deflate")
     .userAgentHeader("Mozilla/5.0 (Macintosh; Intel Mac OS X 10.8; rv:16.0) Gecko/20100101 Firefox/16.0")
 
-  val translationsFilePath = "../text_fr.csv"
+  val translationsFilePath = "text_fr.csv"
   val headers = Map("Content-Type" -> "application/json")
 
   private val body = """{ "input_lang": "en",  "output_lang": "fr", "text": "${Text}" }"""
+  private val maxTextLength = 1000 - body.length + 7 // 7 is the length of ${Text} placeholder
+
+  val splitToFitInBody: PartialFunction[(String, String), Any] = {
+    case ("Text", text: String) if text.length > maxTextLength => text.take(maxTextLength)
+  }
+
   val scn = scenario("Google Translate")
     .feed(
       csv("Reviews.csv")
-//      .convert(splitToFitInBody)
+      .convert(splitToFitInBody)
      )
     .exec(http("en_to_fr")
       .post("/translate")
@@ -43,6 +49,7 @@ class TranslateReviews extends Simulation {
     File(translationsFilePath).delete()
   }
 
+  // 100 concurrent requests rate
   setUp(scn.inject(constantUsersPerSec(100) during(2 hours)).protocols(httpConf))
     .assertions(global.failedRequests.percent.lte(100))
 }

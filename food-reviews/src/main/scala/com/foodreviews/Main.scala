@@ -1,4 +1,4 @@
-package com.foodreviews.spark
+package com.foodreviews
 
 import io.gatling.app.Gatling
 import io.gatling.core.config.GatlingPropertiesBuilder
@@ -8,7 +8,8 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.rogach.scallop._
 
 class Conf(arguments: Seq[String]) extends ScallopConf(arguments) {
-  val path = opt[String](default = Option("Reviews.csv"))
+  val path = opt[String](default = Option("."))
+  val file = opt[String](default = Option("Reviews.csv"))
   val translate = opt[Boolean](default = Option(false))
   val tasks = trailArg[List[String]](required = false, default = Option(Nil))
   verify()
@@ -22,7 +23,8 @@ object Main {
     SparkSession
       .builder()
       .appName("Food Reviews")
-      .config("spark.master", "local")
+      .master("local[4]") // local[4] to use 4 cores
+      .config("spark.executor.memory", "500m")
       .getOrCreate()
 
   // Set the log level to only print errors
@@ -39,7 +41,8 @@ object Main {
       .format("com.databricks.spark.csv") // Use pre-defined CSV data format
       .option("header", "true") // Use first line of all files as header
       .option("inferSchema", "true") // Automatically infer data types
-      .load(conf.path())
+      .load(s"${conf.path()}/${conf.file()}")
+//      .distinct() // Drop duplicates - awfully time-consuming
 
     runTasks(conf.tasks())
 
@@ -51,14 +54,14 @@ object Main {
         case "mostUsedWords"      :: t => mostUsedWords(df); runTasks(t)
         case List("all") => mostActiveUsers(df); mostCommentedFood(df); mostUsedWords(df)
         case _ => println("One of the task names is incorrect or none specified. " +
-          "Possible values: mostActiveUsers mostCommentedFood mostUsedWords")
+          "Possible values: all mostActiveUsers mostCommentedFood mostUsedWords")
       }
     }
 
     // Closing Spark session
     spark.stop()
 
-    if (conf.translate()) translate
+    if (conf.translate()) translate(conf.path())
   }
 
   def mostActiveUsers(df: DataFrame) = {
@@ -79,14 +82,16 @@ object Main {
     words.groupBy("value").count().orderBy(desc("count")).limit(1000).orderBy("value").show(1000)
   }
 
-  def translate = {
+  def translate(path: String) = {
     // This sets the class for the Simulation we want to run.
     val simClass = classOf[TranslateReviews].getName
 
     val props = new GatlingPropertiesBuilder
     props.sourcesDirectory("./src/main/scala")
     props.binariesDirectory("./target/scala-2.11/classes")
+    props.dataDirectory(path)
     props.simulationClass(simClass)
+    println("Sending translation requests ...")
     Gatling.fromMap(props.build)
   }
 }
